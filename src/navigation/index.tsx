@@ -9,6 +9,7 @@ import { RootStackParamList, MainTabsParamList } from '../types';
 import TransactionsScreen from '../screens/TransactionsScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import ReportsScreen from '../screens/ReportsScreen';
+import BudgetScreen from '../screens/BudgetScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
 import EditTransactionScreen from '../screens/EditTransactionScreen';
@@ -30,6 +31,8 @@ function MainTabs() {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Goals') {
             iconName = focused ? 'flag' : 'flag-outline';
+          } else if (route.name === 'Budget') {
+            iconName = focused ? 'calculator' : 'calculator-outline';
           } else if (route.name === 'Reports') {
             iconName = focused ? 'bar-chart' : 'bar-chart-outline';
           } else if (route.name === 'Settings') {
@@ -45,6 +48,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Transactions" component={TransactionsScreen} />
       <Tab.Screen name="Goals" component={GoalsScreen} />
+      <Tab.Screen name="Budget" component={BudgetScreen} />
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
