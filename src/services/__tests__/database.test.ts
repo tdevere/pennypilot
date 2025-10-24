@@ -11,7 +11,7 @@ describe('DatabaseService', () => {
       const transaction: Omit<Transaction, 'id'> = {
         amount: 50.99,
         category: 'Food',
-        type: 'expense',
+        type: 'EXPENSE',
         description: 'Grocery shopping',
         date: '2025-10-23',
         merchant: 'Walmart',
@@ -30,7 +30,7 @@ describe('DatabaseService', () => {
       const transaction: Omit<Transaction, 'id'> = {
         amount: 75.50,
         category: 'Transportation',
-        type: 'expense',
+        type: 'EXPENSE',
         description: 'Gas',
         date: '2025-10-23',
       };
@@ -50,7 +50,7 @@ describe('DatabaseService', () => {
       const transaction: Omit<Transaction, 'id'> = {
         amount: 25.00,
         category: 'Entertainment',
-        type: 'expense',
+        type: 'EXPENSE',
         description: 'Movie tickets',
         date: '2025-10-23',
       };
@@ -67,7 +67,7 @@ describe('DatabaseService', () => {
       await databaseService.addTransaction({
         amount: 100,
         category: 'Food',
-        type: 'expense',
+        type: 'EXPENSE',
         description: 'Test 1',
         date: '2025-10-15',
       });
@@ -75,7 +75,7 @@ describe('DatabaseService', () => {
       await databaseService.addTransaction({
         amount: 200,
         category: 'Food',
-        type: 'expense',
+        type: 'EXPENSE',
         description: 'Test 2',
         date: '2025-10-25',
       });
@@ -98,7 +98,7 @@ describe('DatabaseService', () => {
       transactionId = await databaseService.addTransaction({
         amount: 100,
         category: 'Food',
-        type: 'expense',
+        type: 'EXPENSE',
         description: 'Test transaction',
         date: '2025-10-23',
       });

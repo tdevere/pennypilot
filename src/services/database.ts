@@ -197,6 +197,47 @@ class DatabaseService {
     );
   }
 
+  async updateGoal(id: number, goal: { name?: string; targetAmount?: number; currentAmount?: number; deadline?: string }) {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const updates: string[] = [];
+    const values: any[] = [];
+    
+    if (goal.name !== undefined) {
+      updates.push('name = ?');
+      values.push(goal.name);
+    }
+    if (goal.targetAmount !== undefined) {
+      updates.push('targetAmount = ?');
+      values.push(goal.targetAmount);
+    }
+    if (goal.currentAmount !== undefined) {
+      updates.push('currentAmount = ?');
+      values.push(goal.currentAmount);
+    }
+    if (goal.deadline !== undefined) {
+      updates.push('deadline = ?');
+      values.push(goal.deadline);
+    }
+    
+    values.push(id);
+    
+    await this.db.runAsync(
+      `UPDATE goals SET ${updates.join(', ')} WHERE id = ?`,
+      ...values
+    );
+  }
+
+  async getGoalById(id: number) {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const result = await this.db.getFirstAsync(
+      'SELECT * FROM goals WHERE id = ?',
+      id
+    );
+    return result || null;
+  }
+
   async deleteGoal(id: number): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     await this.db.runAsync('DELETE FROM goals WHERE id = ?', id);
