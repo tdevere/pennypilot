@@ -1,36 +1,31 @@
-import '@testing-library/jest-native/extend-expect';
-
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
-// Mock expo-sqlite
+// Mock expo modules
 jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(() =>
     Promise.resolve({
-      execAsync: jest.fn(),
-      runAsync: jest.fn(),
+      execAsync: jest.fn(() => Promise.resolve()),
+      runAsync: jest.fn(() => Promise.resolve({ lastInsertRowId: 1, changes: 1 })),
       getAllAsync: jest.fn(() => Promise.resolve([])),
       getFirstAsync: jest.fn(() => Promise.resolve(null)),
     })
   ),
 }));
 
-// Mock expo-file-system
 jest.mock('expo-file-system/legacy', () => ({
   documentDirectory: 'file://mock-directory/',
   readAsStringAsync: jest.fn(() => Promise.resolve('{}')),
   writeAsStringAsync: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock expo-sharing
 jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn(() => Promise.resolve()),
   isAvailableAsync: jest.fn(() => Promise.resolve(true)),
 }));
 
-// Mock expo-document-picker
 jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(() =>
     Promise.resolve({
@@ -40,7 +35,6 @@ jest.mock('expo-document-picker', () => ({
   ),
 }));
 
-// Mock expo-image-picker
 jest.mock('expo-image-picker', () => ({
   launchCameraAsync: jest.fn(() =>
     Promise.resolve({
@@ -60,7 +54,6 @@ jest.mock('expo-image-picker', () => ({
   MediaType: { Images: 'Images' },
 }));
 
-// Mock expo-clipboard
 jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(() => Promise.resolve()),
   getStringAsync: jest.fn(() => Promise.resolve('')),
@@ -81,9 +74,10 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn((callback) => callback()),
 }));
 
-// Silence console errors during tests
+// Silence console during tests
 global.console = {
   ...console,
+  log: jest.fn(),
   error: jest.fn(),
   warn: jest.fn(),
 };

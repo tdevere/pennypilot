@@ -10,7 +10,7 @@ module.exports = {
     '!src/**/index.ts',
     '!src/types/**',
   ],
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       branches: 70,
       functions: 70,
@@ -24,4 +24,8 @@ module.exports = {
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   testEnvironment: 'node',
+  moduleNameMapper: {
+    '^expo$': '<rootDir>/node_modules/expo',
+    '^expo-(.*)$': '<rootDir>/node_modules/expo-$1',
+  },
 };
