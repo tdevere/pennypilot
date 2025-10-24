@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import { Transaction, LineItem } from '../types';
+import { Transaction, LineItem, Budget, BudgetProgress } from '../types';
+import { calculateBudgetProgress } from '../utils/budgetCalculations';
 
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
@@ -43,6 +44,17 @@ class DatabaseService {
         currentAmount REAL DEFAULT 0,
         deadline TEXT NOT NULL,
         createdAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS budgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL,
+        month TEXT NOT NULL,
+        year INTEGER NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        UNIQUE(category, month, year)
       );
     `);
 
@@ -300,6 +312,152 @@ class DatabaseService {
       ...row,
       excludeFromReports: row.excludeFromReports === 1,
       merchant: row.merchant || undefined,
+    };
+  }
+
+  // Budget CRUD operations
+  async addBudget(budget: Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const now = new Date().toISOString();
+    const result = await this.db.runAsync(
+      `INSERT INTO budgets (category, amount, month, year, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(category, month, year) DO UPDATE SET 
+         amount = excluded.amount,
+         updatedAt = excluded.updatedAt`,
+      budget.category,
+      budget.amount,
+      budget.month,
+      budget.year,
+      now,
+      now
+    );
+
+    return result.lastInsertRowId;
+  }
+
+  async getBudgetsByMonth(month: string, year: number): Promise<Budget[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = await this.db.getAllAsync<Budget>(
+      'SELECT * FROM budgets WHERE month = ? AND year = ? ORDER BY category ASC',
+      month,
+      year
+    );
+
+    return result;
+  }
+
+  async getBudgetByCategory(category: string, month: string, year: number): Promise<Budget | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = await this.db.getFirstAsync<Budget>(
+      'SELECT * FROM budgets WHERE category = ? AND month = ? AND year = ?',
+      category,
+      month,
+      year
+    );
+
+    return result || null;
+  }
+
+  async updateBudget(id: number, amount: number): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const now = new Date().toISOString();
+    await this.db.runAsync(
+      'UPDATE budgets SET amount = ?, updatedAt = ? WHERE id = ?',
+      amount,
+      now,
+      id
+    );
+  }
+
+  async deleteBudget(id: number): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+    await this.db.runAsync('DELETE FROM budgets WHERE id = ?', id);
+  }
+
+  async getAllBudgets(): Promise<Budget[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = await this.db.getAllAsync<Budget>(
+      'SELECT * FROM budgets ORDER BY year DESC, month DESC, category ASC'
+    );
+
+    return result;
+  }
+
+  /**
+   * Calculate budget vs actual spending for a category
+   */
+  async getBudgetVsActual(category: string, month: string, year: number): Promise<BudgetProgress | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Get budget
+    const budget = await this.getBudgetByCategory(category, month, year);
+    if (!budget) return null;
+
+    // Calculate spent amount for the month
+    // month is already in YYYY-MM format
+    const startDate = `${month}-01`;
+    const endDate = `${month}-31`;
+    
+    const result = await this.db.getFirstAsync<{ total: number }>(
+      `SELECT COALESCE(SUM(amount), 0) as total 
+       FROM transactions 
+       WHERE category = ? 
+       AND type = 'EXPENSE'
+       AND date BETWEEN ? AND ? 
+       AND excludeFromReports = 0`,
+      category,
+      startDate,
+      endDate
+    );
+
+    const spent = result?.total || 0;
+    return calculateBudgetProgress(spent, budget.amount, category);
+  }
+
+  /**
+   * Get all budget progress for a month
+   */
+  async getAllBudgetProgress(month: string, year: number): Promise<BudgetProgress[]> {
+    const budgets = await this.getBudgetsByMonth(month, year);
+    const progressList: BudgetProgress[] = [];
+
+    for (const budget of budgets) {
+      const progress = await this.getBudgetVsActual(budget.category, month, year);
+      if (progress) {
+        progressList.push(progress);
+      }
+    }
+
+    return progressList;
+  }
+
+  /**
+   * Get total budget summary for a month
+   */
+  async getTotalBudgetSummary(month: string, year: number): Promise<{
+    totalBudget: number;
+    totalSpent: number;
+    percentage: number;
+    remaining: number;
+  }> {
+    const progressList = await this.getAllBudgetProgress(month, year);
+
+    const totalBudget = progressList.reduce((sum, p) => sum + p.budget, 0);
+    const totalSpent = progressList.reduce((sum, p) => sum + p.spent, 0);
+    const percentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+    const remaining = totalBudget - totalSpent;
+
+    return {
+      totalBudget,
+      totalSpent,
+      percentage,
+      remaining,
     };
   }
 }

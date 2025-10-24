@@ -29,6 +29,25 @@ export interface Goal {
   createdAt: string;
 }
 
+export interface Budget {
+  id: number;
+  category: string;
+  amount: number;
+  month: string; // Format: 'YYYY-MM'
+  year: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetProgress {
+  category: string;
+  budget: number;
+  spent: number;
+  percentage: number;
+  status: 'healthy' | 'warning' | 'critical' | 'over';
+  remaining: number;
+}
+
 export type RootStackParamList = {
   MainTabs: undefined;
   AddTransaction: undefined;
@@ -42,5 +61,6 @@ export type MainTabsParamList = {
   Transactions: undefined;
   Goals: undefined;
   Reports: undefined;
+  Budget: undefined;
   Settings: undefined;
 };

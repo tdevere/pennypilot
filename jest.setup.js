@@ -16,10 +16,12 @@ const mockDatabase = {
   transactions: new Map(),
   lineItems: new Map(),
   goals: new Map(),
+  budgets: new Map(),
   nextId: {
     transactions: 1,
     lineItems: 1,
     goals: 1,
+    budgets: 1,
   },
 };
 
@@ -68,6 +70,34 @@ jest.mock('expo-sqlite', () => ({
             createdAt: params[4],
           });
           changes = 1;
+        } else if (sql.includes('INSERT INTO budgets')) {
+          // Handle ON CONFLICT - check if budget exists for category/month/year
+          const category = params[0];
+          const month = params[2];
+          const year = params[3];
+          const existingBudget = Array.from(mockDatabase.budgets.values()).find(
+            b => b.category === category && b.month === month && b.year === year
+          );
+          
+          if (existingBudget) {
+            // Update existing
+            existingBudget.amount = params[1];
+            existingBudget.updatedAt = params[5];
+            lastInsertRowId = existingBudget.id;
+          } else {
+            // Insert new
+            lastInsertRowId = mockDatabase.nextId.budgets++;
+            mockDatabase.budgets.set(lastInsertRowId, {
+              id: lastInsertRowId,
+              category: params[0],
+              amount: params[1],
+              month: params[2],
+              year: params[3],
+              createdAt: params[4],
+              updatedAt: params[5],
+            });
+          }
+          changes = 1;
         } else if (sql.includes('UPDATE transactions')) {
           const id = params[params.length - 1];
           const existing = mockDatabase.transactions.get(id);
@@ -115,6 +145,18 @@ jest.mock('expo-sqlite', () => ({
         } else if (sql.includes('DELETE FROM goals')) {
           const id = params[0];
           if (mockDatabase.goals.delete(id)) changes = 1;
+        } else if (sql.includes('UPDATE budgets')) {
+          // UPDATE budgets SET amount = ?, updatedAt = ? WHERE id = ?
+          const id = params[params.length - 1];
+          const existing = mockDatabase.budgets.get(id);
+          if (existing) {
+            existing.amount = params[0];
+            existing.updatedAt = params[1];
+            changes = 1;
+          }
+        } else if (sql.includes('DELETE FROM budgets')) {
+          const id = params[0];
+          if (mockDatabase.budgets.delete(id)) changes = 1;
         }
         
         return Promise.resolve({ lastInsertRowId, changes });
@@ -139,16 +181,54 @@ jest.mock('expo-sqlite', () => ({
           return Promise.resolve(Array.from(mockDatabase.lineItems.values()));
         } else if (sql.includes('FROM goals')) {
           return Promise.resolve(Array.from(mockDatabase.goals.values()));
+        } else if (sql.includes('FROM budgets')) {
+          let budgets = Array.from(mockDatabase.budgets.values());
+          // Filter by month and year if specified
+          if (sql.includes('WHERE month = ?') && params.length >= 2) {
+            const month = params[0];
+            const year = params[1];
+            budgets = budgets.filter(b => b.month === month && b.year === year);
+          }
+          return Promise.resolve(budgets);
         }
         return Promise.resolve([]);
       }),
       getFirstAsync: jest.fn((sql, ...params) => {
         if (sql.includes('FROM transactions') && params.length > 0) {
+          // Handle WHERE clause for budget vs actual calculation
+          if (sql.includes('SUM(amount)')) {
+            // SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE...
+            const category = params[0];
+            const startDate = params[1];
+            const endDate = params[2];
+            const total = Array.from(mockDatabase.transactions.values())
+              .filter(t => 
+                t.category === category && 
+                t.type === 'EXPENSE' &&
+                t.date >= startDate && 
+                t.date <= endDate &&
+                t.excludeFromReports === 0
+              )
+              .reduce((sum, t) => sum + t.amount, 0);
+            return Promise.resolve({ total });
+          }
           return Promise.resolve(mockDatabase.transactions.get(params[0]) || null);
         } else if (sql.includes('FROM line_items') && params.length > 0) {
           return Promise.resolve(mockDatabase.lineItems.get(params[0]) || null);
         } else if (sql.includes('FROM goals') && params.length > 0) {
           return Promise.resolve(mockDatabase.goals.get(params[0]) || null);
+        } else if (sql.includes('FROM budgets') && params.length > 0) {
+          // Get budget by category, month, year
+          if (params.length === 3) {
+            const category = params[0];
+            const month = params[1];
+            const year = params[2];
+            const budget = Array.from(mockDatabase.budgets.values()).find(
+              b => b.category === category && b.month === month && b.year === year
+            );
+            return Promise.resolve(budget || null);
+          }
+          return Promise.resolve(mockDatabase.budgets.get(params[0]) || null);
         }
         return Promise.resolve(null);
       }),
