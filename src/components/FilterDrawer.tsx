@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -57,6 +57,10 @@ export default function FilterDrawer({
   onClear,
 }: FilterDrawerProps) {
   const [localFilters, setLocalFilters] = useState<FilterOptions>(filters);
+
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
 
   const toggleCategory = (category: string) => {
     const newCategories = localFilters.categories.includes(category)
