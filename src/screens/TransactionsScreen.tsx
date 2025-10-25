@@ -12,6 +12,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Transaction, RootStackParamList } from '../types';
 import { databaseService } from '../services/database';
+import SearchBar from '../components/SearchBar';
+import FilterDrawer, { FilterOptions } from '../components/FilterDrawer';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -19,10 +21,35 @@ export default function TransactionsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterDrawerVisible, setFilterDrawerVisible] = useState(false);
+  const [filters, setFilters] = useState<FilterOptions>({
+    categories: [],
+    startDate: undefined,
+    endDate: undefined,
+    minAmount: undefined,
+    maxAmount: undefined,
+    types: [],
+    sortBy: 'date',
+    sortOrder: 'DESC',
+  });
 
   const loadTransactions = async () => {
     try {
-      const data = await databaseService.getAllTransactions();
+      // Build filter object
+      const searchFilters = {
+        searchQuery: searchQuery || undefined,
+        categories: filters.categories.length > 0 ? filters.categories : undefined,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        minAmount: filters.minAmount,
+        maxAmount: filters.maxAmount,
+        types: filters.types.length > 0 ? filters.types : undefined,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
+      };
+
+      const data = await databaseService.searchAndFilterTransactions(searchFilters);
       setTransactions(data);
     } catch (error) {
       console.error('Error loading transactions:', error);
@@ -32,13 +59,41 @@ export default function TransactionsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadTransactions();
-    }, [])
+    }, [searchQuery, filters])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadTransactions();
     setRefreshing(false);
+  };
+
+  const handleApplyFilters = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      categories: [],
+      startDate: undefined,
+      endDate: undefined,
+      minAmount: undefined,
+      maxAmount: undefined,
+      types: [],
+      sortBy: 'date',
+      sortOrder: 'DESC',
+    });
+    setSearchQuery('');
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.categories.length > 0) count++;
+    if (filters.startDate || filters.endDate) count++;
+    if (filters.minAmount !== undefined || filters.maxAmount !== undefined) count++;
+    if (filters.types.length > 0 && filters.types.length < 2) count++;
+    if (searchQuery.trim()) count++;
+    return count;
   };
 
   const formatCurrency = (amount: number) => {
@@ -83,18 +138,59 @@ export default function TransactionsScreen() {
     </TouchableOpacity>
   );
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="wallet-outline" size={64} color="#ccc" />
-      <Text style={styles.emptyTitle}>No transactions yet</Text>
-      <Text style={styles.emptySubtitle}>Tap + to add your first transaction</Text>
-    </View>
-  );
+  const renderEmpty = () => {
+    const hasActiveFilters = getActiveFilterCount() > 0;
+    
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons 
+          name={hasActiveFilters ? 'search-outline' : 'wallet-outline'} 
+          size={64} 
+          color="#ccc" 
+        />
+        <Text style={styles.emptyTitle}>
+          {hasActiveFilters ? 'No transactions found' : 'No transactions yet'}
+        </Text>
+        <Text style={styles.emptySubtitle}>
+          {hasActiveFilters 
+            ? 'Try adjusting your search or filters' 
+            : 'Tap + to add your first transaction'}
+        </Text>
+        {hasActiveFilters && (
+          <TouchableOpacity 
+            style={styles.clearFiltersButton}
+            onPress={handleClearFilters}
+          >
+            <Text style={styles.clearFiltersText}>Clear Filters</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Transactions</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Transactions</Text>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setFilterDrawerVisible(true)}
+          >
+            <Ionicons name="filter" size={24} color="#10b981" />
+            {getActiveFilterCount() > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{getActiveFilterCount()}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onClear={() => setSearchQuery('')}
+          placeholder="Search by merchant or description..."
+        />
       </View>
 
       <FlatList
@@ -121,6 +217,14 @@ export default function TransactionsScreen() {
       >
         <Ionicons name="camera" size={28} color="white" />
       </TouchableOpacity>
+
+      <FilterDrawer
+        visible={filterDrawerVisible}
+        filters={filters}
+        onClose={() => setFilterDrawerVisible(false)}
+        onApply={handleApplyFilters}
+        onClear={handleClearFilters}
+      />
     </View>
   );
 }
@@ -251,5 +355,46 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  filterButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  filterBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  clearFiltersButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+  },
+  clearFiltersText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

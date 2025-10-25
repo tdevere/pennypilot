@@ -7,6 +7,7 @@ class DatabaseService {
   async init() {
     this.db = await SQLite.openDatabaseAsync('pennypilot.db');
     await this.createTables();
+    await this.createSearchIndexes();
   }
 
   private async createTables() {
@@ -158,6 +159,101 @@ class DatabaseService {
       excludeFromReports: row.excludeFromReports === 1,
       merchant: row.merchant || undefined,
     }));
+  }
+
+  // Search and Filter operations
+  async searchAndFilterTransactions(filters: {
+    searchQuery?: string;
+    categories?: string[];
+    startDate?: string;
+    endDate?: string;
+    minAmount?: number;
+    maxAmount?: number;
+    types?: ('INCOME' | 'EXPENSE')[];
+    sortBy?: 'date' | 'amount' | 'category';
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<Transaction[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    // Search query (merchant or description)
+    if (filters.searchQuery && filters.searchQuery.trim()) {
+      conditions.push('(LOWER(merchant) LIKE ? OR LOWER(description) LIKE ?)');
+      const searchTerm = `%${filters.searchQuery.toLowerCase()}%`;
+      params.push(searchTerm, searchTerm);
+    }
+
+    // Category filter
+    if (filters.categories && filters.categories.length > 0) {
+      const placeholders = filters.categories.map(() => '?').join(',');
+      conditions.push(`category IN (${placeholders})`);
+      params.push(...filters.categories);
+    }
+
+    // Date range filter
+    if (filters.startDate) {
+      conditions.push('date >= ?');
+      params.push(filters.startDate);
+    }
+    if (filters.endDate) {
+      conditions.push('date <= ?');
+      params.push(filters.endDate);
+    }
+
+    // Amount range filter
+    if (filters.minAmount !== undefined) {
+      conditions.push('amount >= ?');
+      params.push(filters.minAmount);
+    }
+    if (filters.maxAmount !== undefined) {
+      conditions.push('amount <= ?');
+      params.push(filters.maxAmount);
+    }
+
+    // Type filter (INCOME/EXPENSE)
+    if (filters.types && filters.types.length > 0) {
+      const placeholders = filters.types.map(() => '?').join(',');
+      conditions.push(`type IN (${placeholders})`);
+      params.push(...filters.types);
+    }
+
+    // Build WHERE clause
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Build ORDER BY clause
+    const sortBy = filters.sortBy || 'date';
+    const sortOrder = filters.sortOrder || 'DESC';
+    const orderByClause = `ORDER BY ${sortBy} ${sortOrder}`;
+
+    // Execute query
+    const query = `SELECT * FROM transactions ${whereClause} ${orderByClause}`;
+    const result = await this.db.getAllAsync<any>(query, ...params);
+
+    return result.map(row => ({
+      ...row,
+      excludeFromReports: row.excludeFromReports === 1,
+      merchant: row.merchant || undefined,
+    }));
+  }
+
+  async createSearchIndexes(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      // Create indexes for better search performance
+      await this.db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+        CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
+        CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
+        CREATE INDEX IF NOT EXISTS idx_transactions_amount ON transactions(amount);
+        CREATE INDEX IF NOT EXISTS idx_transactions_merchant ON transactions(merchant);
+      `);
+      console.log('Created search indexes successfully');
+    } catch (error) {
+      console.error('Error creating search indexes:', error);
+    }
   }
 
   // Goal CRUD operations

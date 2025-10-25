@@ -1,6 +1,24 @@
 import { databaseService } from '../database';
 import { Transaction, Goal, LineItem } from '../../types';
 
+const createTestTransaction = (
+  overrides: Partial<Omit<Transaction, 'id'>> = {}
+): Omit<Transaction, 'id'> => {
+  const timestamp = new Date().toISOString();
+
+  return {
+    amount: 100,
+    category: 'Misc',
+    type: 'EXPENSE',
+    description: 'Test transaction',
+    date: '2025-10-23',
+    excludeFromReports: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    ...overrides,
+  };
+};
+
 describe('DatabaseService', () => {
   beforeAll(async () => {
     await databaseService.init();
@@ -8,14 +26,14 @@ describe('DatabaseService', () => {
 
   describe('Transactions', () => {
     it('should add a transaction', async () => {
-      const transaction: Omit<Transaction, 'id'> = {
+      const transaction = createTestTransaction({
         amount: 50.99,
         category: 'Food',
         type: 'EXPENSE',
         description: 'Grocery shopping',
         date: '2025-10-23',
         merchant: 'Walmart',
-      };
+      });
 
       const id = await databaseService.addTransaction(transaction);
       expect(id).toBeGreaterThan(0);
@@ -27,19 +45,18 @@ describe('DatabaseService', () => {
     });
 
     it('should update a transaction', async () => {
-      const transaction: Omit<Transaction, 'id'> = {
-        amount: 75.50,
+      const transaction = createTestTransaction({
+        amount: 75.5,
         category: 'Transportation',
         type: 'EXPENSE',
         description: 'Gas',
         date: '2025-10-23',
-      };
+      });
 
       const id = await databaseService.addTransaction(transaction);
-      
+
       await databaseService.updateTransaction(id, {
-        ...transaction,
-        amount: 80.00,
+        amount: 80.0,
       });
 
       const updated = await databaseService.getTransactionById(id);
@@ -47,13 +64,13 @@ describe('DatabaseService', () => {
     });
 
     it('should delete a transaction', async () => {
-      const transaction: Omit<Transaction, 'id'> = {
-        amount: 25.00,
+      const transaction = createTestTransaction({
+        amount: 25.0,
         category: 'Entertainment',
         type: 'EXPENSE',
         description: 'Movie tickets',
         date: '2025-10-23',
-      };
+      });
 
       const id = await databaseService.addTransaction(transaction);
       await databaseService.deleteTransaction(id);
@@ -64,21 +81,25 @@ describe('DatabaseService', () => {
 
     it('should filter transactions by date range', async () => {
       // Add some test transactions
-      await databaseService.addTransaction({
-        amount: 100,
-        category: 'Food',
-        type: 'EXPENSE',
-        description: 'Test 1',
-        date: '2025-10-15',
-      });
+      await databaseService.addTransaction(
+        createTestTransaction({
+          amount: 100,
+          category: 'Food',
+          type: 'EXPENSE',
+          description: 'Test 1',
+          date: '2025-10-15',
+        })
+      );
 
-      await databaseService.addTransaction({
-        amount: 200,
-        category: 'Food',
-        type: 'EXPENSE',
-        description: 'Test 2',
-        date: '2025-10-25',
-      });
+      await databaseService.addTransaction(
+        createTestTransaction({
+          amount: 200,
+          category: 'Food',
+          type: 'EXPENSE',
+          description: 'Test 2',
+          date: '2025-10-25',
+        })
+      );
 
       const startDate = '2025-10-01';
       const endDate = '2025-10-20';
@@ -95,13 +116,15 @@ describe('DatabaseService', () => {
     let transactionId: number;
 
     beforeEach(async () => {
-      transactionId = await databaseService.addTransaction({
-        amount: 100,
-        category: 'Food',
-        type: 'EXPENSE',
-        description: 'Test transaction',
-        date: '2025-10-23',
-      });
+      transactionId = await databaseService.addTransaction(
+        createTestTransaction({
+          amount: 100,
+          category: 'Food',
+          type: 'EXPENSE',
+          description: 'Test transaction',
+          date: '2025-10-23',
+        })
+      );
     });
 
     it('should add a line item', async () => {
@@ -204,7 +227,7 @@ describe('DatabaseService', () => {
         currentAmount: 1000,
       });
 
-      const updated = await databaseService.getGoalById(id);
+  const updated = (await databaseService.getGoalById(id)) as Goal | null;
       expect(updated?.currentAmount).toBe(1000);
     });
 
@@ -232,7 +255,7 @@ describe('DatabaseService', () => {
       };
 
       const id = await databaseService.addGoal(goal);
-      const retrieved = await databaseService.getGoalById(id);
+  const retrieved = (await databaseService.getGoalById(id)) as Goal | null;
 
       expect(retrieved).not.toBeNull();
       if (retrieved) {

@@ -50,7 +50,7 @@ export default function GoalsScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Add',
-          onPress: async (value) => {
+          onPress: async (value: string | undefined) => {
             const amount = parseFloat(value || '0');
             if (amount > 0) {
               const newAmount = goal.currentAmount + amount;
