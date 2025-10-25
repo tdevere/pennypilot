@@ -60,6 +60,12 @@ export default function TransactionsScreen() {
         <Text style={styles.category}>{item.category}</Text>
         <View style={styles.dateRow}>
           <Text style={styles.date}>{formatDate(item.date)}</Text>
+          {item.recurringTransactionId && (
+            <View style={styles.recurringBadge}>
+              <Ionicons name="repeat" size={12} color="#3b82f6" />
+              <Text style={styles.recurringText}>Recurring</Text>
+            </View>
+          )}
           {item.excludeFromReports && (
             <View style={styles.excludedBadge}>
               <Ionicons name="eye-off-outline" size={12} color="#FF9500" />
@@ -181,6 +187,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  recurringBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 4,
+  },
+  recurringText: {
+    fontSize: 10,
+    color: '#3b82f6',
+    fontWeight: '600',
   },
   excludedBadge: {
     flexDirection: 'row',
